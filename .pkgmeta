@@ -1,0 +1,8 @@
+package-as: LootLedger
+
+ignore:
+  - tests
+  - docs
+  - .github
+  - .pkgmeta
+  - .gitignore

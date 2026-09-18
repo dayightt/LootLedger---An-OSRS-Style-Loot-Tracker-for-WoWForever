@@ -4,6 +4,7 @@
 ## Author: Daylight
 ## Version: 1.0.0
 ## IconTexture: Interface\Icons\INV_Misc_Coin_02
+## X-Curse-Project-ID: 1701492
 ## OptionalDeps: Auctionator, Auctioneer
 ## SavedVariables: LootLedgerDB
 ## SavedVariablesPerCharacter: LootLedgerCharDB
