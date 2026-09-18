@@ -10,7 +10,7 @@ LL.UI = UI
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 440, 520
 local MIN_WIDTH, MIN_HEIGHT = 340, 260
-local LIST_TOP = 84
+local LIST_TOP = 100
 local GREY = "|cffaaaaaa"
 local SEP = "  |cff777777·|r  "
 
@@ -521,15 +521,16 @@ local function createWindow()
     window.resetButton.icon:SetTexCoord(0, 1, 0, 1)
 
     -- Summary line and Restart Session.
-    window.summary = W.CreateLabel(window, "GameFontHighlight", "", "LEFT")
-    window.summary:SetPoint("TOPLEFT", 64, -34)
-    window.summary:SetPoint("RIGHT", toolbar, "LEFT", -4, 0)
-    window.note = W.CreateLabel(window, "GameFontHighlightSmall", "", "LEFT")
-    window.note:SetPoint("TOPLEFT", 64, -56)
     window.restartButton = W.CreateButton(window, "Restart Session", 110, 20, function()
         W.Confirm("RESTART", "Archive this session to the history and start a new one?", function() LL.Session.Restart() end)
     end)
-    window.restartButton:SetPoint("TOPRIGHT", -10, -54)
+    window.restartButton:SetPoint("RIGHT", toolbar, "LEFT", -8, 0)
+    window.summary = W.CreateLabel(window, "GameFontHighlight", "", "LEFT")
+    window.summary:SetPoint("TOPLEFT", 14, -60)
+    window.summary:SetPoint("RIGHT", window, "RIGHT", -14, 0)
+    window.summary:SetWordWrap(false)
+    window.note = W.CreateLabel(window, "GameFontHighlightSmall", "", "LEFT")
+    window.note:SetPoint("TOPLEFT", 14, -80)
 
     -- List inset.
     local inset = CreateFrame("Frame", nil, window, "InsetFrameTemplate")

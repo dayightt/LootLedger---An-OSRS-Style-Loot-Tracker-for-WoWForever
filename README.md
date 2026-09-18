@@ -1,5 +1,7 @@
 # LootLedger
 
+![LootLedger](docs/art/screenshot.png)
+
 A gold-per-hour and loot tracker for **World of Warcraft: Forever**. It runs from the moment you log in: every corpse you loot, every item and every coin drop is attributed to the mob it came from, valued, and rolled into a live gold/hour rate - alongside a persistent per-mob loot history with a portrait of each mob and a grid of everything it has dropped.
 
 ## Install
