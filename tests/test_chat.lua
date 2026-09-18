@@ -1,0 +1,85 @@
+local stub = require("wow_stub")
+
+local WATER = "|cnIQ1:|Hitem:159::::::::6:1485:::::::::|h[Refreshing Spring Water]|h|r"
+local ROD = "|cnIQ1:|Hitem:263428::::::::6:1485::11:::::::|h[Dowsing Rod]|h|r"
+
+local function classify(LL, text)
+    return LL.Tracker.ClassifyLootMessage(text)
+end
+
+T.test("own single and multiple receipts", function()
+    local LL = stub.LoadAddon()
+    local kind, link, qty, player = classify(LL, "You receive loot: " .. WATER)
+    T.eq(kind, "own"); T.eq(link, WATER); T.eq(qty, 1); T.isnil(player)
+    kind, link, qty = classify(LL, "You receive loot: " .. WATER .. "x3")
+    T.eq(kind, "own"); T.eq(link, WATER); T.eq(qty, 3)
+end)
+
+T.test("own roll wins in every phrasing", function()
+    local LL = stub.LoadAddon()
+    local kind, link, qty, roll = classify(LL, "|HlootHistory:7|h[Loot]|h: You won: " .. WATER)
+    T.eq(kind, "own"); T.eq(link, WATER); T.eq(qty, 1); T.eq(roll, nil)
+    kind, link, qty, _, isRoll = classify(LL, "|HlootHistory:7|h[Loot]|h: You (Need - 93, Main-Spec) Won: " .. WATER)
+    T.eq(kind, "own"); T.eq(link, WATER); T.truthy(isRoll)
+    kind, link = classify(LL, "|HlootHistory:7|h[Loot]|h: You (Greed - 12) Won: " .. WATER)
+    T.eq(kind, "own"); T.eq(link, WATER)
+end)
+
+T.test("other players' receipts and roll wins carry the player name", function()
+    local LL = stub.LoadAddon()
+    local kind, link, qty, player = classify(LL, "Bob receives loot: " .. WATER .. ".")
+    T.eq(kind, "other"); T.eq(link, WATER); T.eq(qty, 1); T.eq(player, "Bob")
+    kind, link, qty, player = classify(LL, "Bob-Realm receives loot: " .. WATER .. "x2.")
+    T.eq(kind, "other"); T.eq(qty, 2); T.eq(player, "Bob-Realm")
+    kind, link, qty, player = classify(LL, "|HlootHistory:7|h[Loot]|h: Bob won: " .. WATER)
+    T.eq(kind, "other"); T.eq(player, "Bob")
+    kind, link, qty, player = classify(LL, "|HlootHistory:7|h[Loot]|h: Bob (Need - 93, Main-Spec) Won: " .. WATER)
+    T.eq(kind, "other"); T.eq(player, "Bob")
+    kind, link, qty, player = classify(LL, "|HlootHistory:7|h[Loot]|h: Bob (Greed - 4) Won: " .. WATER)
+    T.eq(kind, "other"); T.eq(player, "Bob")
+end)
+
+T.test("pushed, created, refunded and roll-process lines are not loot", function()
+    local LL = stub.LoadAddon()
+    T.isnil(classify(LL, "You receive item: " .. ROD))
+    T.isnil(classify(LL, "You receive item: " .. ROD .. "x2"))
+    T.isnil(classify(LL, "Bob receives item: " .. ROD .. "."))
+    T.isnil(classify(LL, "You create: " .. WATER .. "."))
+    T.isnil(classify(LL, "You are refunded: " .. WATER .. "."))
+    T.isnil(classify(LL, "|HlootHistory:7|h[Loot]|h: You have selected Greed for: " .. WATER))
+    T.isnil(classify(LL, "|HlootHistory:7|h[Loot]|h: Bob has selected Need for: " .. WATER))
+    T.isnil(classify(LL, "|HlootHistory:7|h[Loot]|h: Greed Roll - 55 for " .. WATER .. " by Bob"))
+    T.isnil(classify(LL, "|HlootHistory:7|h[Loot]|h: Everyone passed on: " .. WATER))
+    T.isnil(classify(LL, "|HlootHistory:7|h[Loot]|h: You passed on: " .. WATER))
+    T.isnil(classify(LL, "You loot 16 Copper"))
+    T.isnil(classify(LL, "You receive loot: nothing linked"))
+end)
+
+T.test("secret or missing text is ignored without error", function()
+    local LL = stub.LoadAddon()
+    T.noerror(function()
+        T.isnil(classify(LL, stub.MakeSecret("You receive loot: " .. WATER)))
+        T.isnil(classify(LL, nil))
+        T.isnil(classify(LL, 42))
+    end)
+end)
+
+T.test("patterns come from the client's strings, not from English", function()
+    local LL = stub.LoadAddon()
+    _G.LOOT_ITEM_SELF = "Ihr erhaltet Beute: %s"
+    _G.LOOT_ITEM_SELF_MULTIPLE = "Ihr erhaltet Beute: %sx%d"
+    _G.LOOT_ITEM = "%s erhält Beute: %s."
+    LL.Tracker.CompilePatterns()
+    local kind, link, qty = classify(LL, "Ihr erhaltet Beute: " .. WATER .. "x4")
+    T.eq(kind, "own"); T.eq(qty, 4)
+    kind, link, qty, player = classify(LL, "Hans erhält Beute: " .. WATER .. ".")
+    T.eq(kind, "other"); T.eq(player, "Hans")
+    T.isnil(classify(LL, "You receive loot: " .. WATER))
+end)
+
+T.test("a missing global string is skipped rather than crashing", function()
+    local LL = stub.LoadAddon()
+    _G.LOOT_ROLL_YOU_WON_NO_SPAM_GREED = nil
+    T.noerror(function() LL.Tracker.CompilePatterns() end)
+    T.eq((classify(LL, "You receive loot: " .. WATER)), "own")
+end)

@@ -1,0 +1,125 @@
+local stub = require("wow_stub")
+
+T.test("a session exists as soon as the DB is ready", function()
+    local LL = stub.LoadAddon()
+    local s = LL.Session.Get()
+    T.truthy(s)
+    T.eq(s, LL.CharDB.session)
+    T.eq(s.startTime, 1700000000)
+    T.eq(s.activeSeconds, 0)
+    T.deq(s.mobs, {})
+    T.deq(s.unattributed, { coin = 0, items = {}, unclaimed = {} })
+end)
+
+T.test("an existing session is resumed, not replaced, on load", function()
+    local LL = stub.LoadAddon({ before = function()
+        _G.LootLedgerCharDB = { version = 1, session = { startTime = 1699990000, activeSeconds = 300, mobs = { [1] = { name = "A", kills = 4, coin = 12, items = {}, unclaimed = {} } } }, history = {} }
+    end })
+    T.eq(LL.Session.Get().mobs[1].kills, 4)
+    T.eq(LL.Session.Get().startTime, 1699990000)
+    T.deq(LL.Session.Get().unattributed, { coin = 0, items = {}, unclaimed = {} }, "filled in for older sessions")
+end)
+
+T.test("active seconds count only logged-in time", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    stub.Advance(100)
+    T.eq(LL.Session.GetActiveSeconds(), 100)
+    stub.FireEvent("PLAYER_LOGOUT")
+    T.eq(LL.Session.Get().activeSeconds, 100)
+    stub.Advance(500) -- logged out
+    T.eq(LL.Session.GetActiveSeconds(), 100)
+    stub.FireEvent("PLAYER_LOGIN")
+    stub.Advance(50)
+    T.eq(LL.Session.GetActiveSeconds(), 150)
+end)
+
+T.test("Restart archives the session newest-first and starts fresh", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    local s = LL.Session.Get()
+    s.mobs[257532] = { name = "Windshaper Novice Seer", kills = 5, coin = 1234, items = {}, unclaimed = {} }
+    s.mobs[251661] = { name = "Galestrider", kills = 2, coin = 0, items = {}, unclaimed = {} }
+    stub.Advance(90)
+    local fired = 0
+    LL.On("SESSION_CHANGED", function() fired = fired + 1 end)
+    LL.Session.Restart()
+    T.eq(#LL.CharDB.history, 1)
+    local h = LL.CharDB.history[1]
+    T.eq(h.label, "Windshaper Novice Seer")
+    T.eq(h.kills, 7)
+    T.eq(h.coin, 1234)
+    T.eq(h.activeSeconds, 90)
+    T.eq(h.startTime, 1700000000)
+    T.eq(h.endTime, 1700000090)
+    T.eq(h.topMobs[1].npcID, 257532)
+    T.deq(LL.Session.Get().mobs, {})
+    T.eq(LL.Session.Get().startTime, 1700000090)
+    T.truthy(fired >= 1)
+
+    stub.Advance(10)
+    LL.Session.Restart("Custom label")
+    T.eq(#LL.CharDB.history, 2)
+    T.eq(LL.CharDB.history[1].label, "Custom label")
+    T.eq(LL.CharDB.history[2].label, "Windshaper Novice Seer")
+end)
+
+T.test("history is capped at 100 entries", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    for i = 1, 105 do
+        LL.Session.Restart("s" .. i)
+    end
+    T.eq(#LL.CharDB.history, 100)
+    T.eq(LL.CharDB.history[1].label, "s105")
+    T.eq(LL.CharDB.history[100].label, "s6")
+end)
+
+T.test("LabelFor prefers the instance, then the top mob, then a default", function()
+    local LL = stub.LoadAddon()
+    T.eq(LL.Session.LabelFor(), "Session")
+    LL.Session.Get().mobs[1] = { name = "A", kills = 2, coin = 0, items = {}, unclaimed = {} }
+    LL.Session.Get().mobs[2] = { name = "B", kills = 9, coin = 0, items = {}, unclaimed = {} }
+    T.eq(LL.Session.LabelFor(), "B")
+    stub.instance = { name = "Ragefire Chasm", type = "party" }
+    T.eq(LL.Session.LabelFor(), "Ragefire Chasm")
+end)
+
+T.test("DeleteHistory and ClearHistory", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    LL.Session.Restart("one")
+    LL.Session.Restart("two")
+    LL.Session.Restart("three")
+    LL.Session.DeleteHistory(2)
+    T.eq(#LL.Session.History(), 2)
+    T.eq(LL.Session.History()[1].label, "three")
+    T.eq(LL.Session.History()[2].label, "one")
+    LL.Session.ClearHistory()
+    T.eq(#LL.Session.History(), 0)
+end)
+
+T.test("ResetSession wipes the live session without archiving", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    LL.Session.Get().mobs[1] = { name = "A", kills = 3, coin = 0, items = {}, unclaimed = {} }
+    LL.Session.ResetSession()
+    T.deq(LL.Session.Get().mobs, {})
+    T.eq(#LL.CharDB.history, 0)
+end)
+
+T.test("Heartbeat folds time without changing the total", function()
+    local LL = stub.LoadAddon()
+    stub.FireEvent("PLAYER_LOGIN")
+    stub.Advance(45)
+    LL.Session.Heartbeat()
+    T.eq(LL.Session.Get().activeSeconds, 45)
+    T.eq(LL.Session.GetActiveSeconds(), 45)
+    stub.Advance(15)
+    T.eq(LL.Session.GetActiveSeconds(), 60)
+    -- A login after a logout that never fired PLAYER_LOGOUT discards the
+    -- unfolded tail (never logged-out time), so at most one heartbeat is lost.
+    stub.Advance(3600)
+    stub.FireEvent("PLAYER_LOGIN")
+    T.eq(LL.Session.GetActiveSeconds(), 45)
+end)
