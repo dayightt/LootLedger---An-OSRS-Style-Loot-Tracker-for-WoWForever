@@ -529,7 +529,21 @@ function Widgets.FillItemButton(button, icon, count, quality, link, dimmed)
     end
     if SetItemButtonTexture then SetItemButtonTexture(button, icon) elseif button.icon then button.icon:SetTexture(icon) end
     if SetItemButtonCount then SetItemButtonCount(button, count or 1) elseif button.Count then button.Count:SetText(count and count > 1 and tostring(count) or "") end
-    if SetItemButtonQuality then
+    if button.Frame and Widgets.IsModern() then
+        -- Modern skin: the 1px frame carries the quality colour. The
+        -- template's own quality overlays are never invoked here - without
+        -- the slot art they size wrong - and any it owns stay hidden.
+        if quality and quality > 1 then
+            local r, g, b = Widgets.QualityColor(quality)
+            button.Frame:SetBackdropBorderColor(r, g, b, 1)
+        else
+            button.Frame:SetBackdropBorderColor(unpack(T.border))
+        end
+        for _, key in ipairs({ "IconBorder", "IconOverlay", "IconOverlay2", "ProfessionQualityOverlay", "ItemContextOverlay" }) do
+            local tex = button[key]
+            if tex and tex.Hide then tex:Hide() end
+        end
+    elseif SetItemButtonQuality then
         pcall(SetItemButtonQuality, button, quality, link)
     elseif button.IconBorder then
         if quality and quality > 1 then
@@ -538,17 +552,6 @@ function Widgets.FillItemButton(button, icon, count, quality, link, dimmed)
         else
             button.IconBorder:Hide()
         end
-    end
-    if button.Frame and Widgets.IsModern() then
-        -- Modern skin: the 1px frame takes the quality colour, so the
-        -- template's overlay is not needed on top.
-        if quality and quality > 1 then
-            local r, g, b = Widgets.QualityColor(quality)
-            button.Frame:SetBackdropBorderColor(r, g, b, 0.9)
-        else
-            button.Frame:SetBackdropBorderColor(unpack(T.border))
-        end
-        if button.IconBorder then button.IconBorder:Hide() end
     end
     if SetItemButtonDesaturated then
         SetItemButtonDesaturated(button, dimmed and true or false)

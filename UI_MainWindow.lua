@@ -352,19 +352,18 @@ end
 
 local function updateSummary()
     if not window or not window:IsShown() or not lastReport then return end
+    local text
     if lastScope == "session" then
-        window.summary:SetText(sessionSummary(lastReport))
+        text = sessionSummary(lastReport)
         window.restartButton:Show()
-        if lastReport.anyUnpriced then
-            window.note:SetText(GREY .. "some items have no price yet|r")
-        else
-            window.note:SetText("")
-        end
     else
-        window.summary:SetText(allTimeSummary(lastReport))
+        text = allTimeSummary(lastReport)
         window.restartButton:Hide()
-        window.note:SetText(lastReport.anyUnpriced and (GREY .. "some items have no price yet|r") or "")
     end
+    if lastReport.anyUnpriced then
+        text = text .. SEP .. GREY .. "some items unpriced|r"
+    end
+    window.summary:SetText(text)
 end
 
 local function updateStrip()
@@ -464,15 +463,24 @@ local function createWindow()
     local top = W.ContentTop()
     local listTop = top + 70
 
-    -- Toolbar (right-aligned icon buttons).
+    -- Toolbar (right-aligned icon buttons). The modern title bar has room
+    -- for it beside the close button, which keeps row two free for the
+    -- tabs and the Restart button even at the minimum width.
+    local modern = W.IsModern()
     local toolbar = CreateFrame("Frame", nil, window)
-    toolbar:SetPoint("TOPRIGHT", -8, -top)
-    toolbar:SetSize(160, 22)
+    local iconSize, step = 20, 24
+    if modern then
+        iconSize, step = 18, 22
+        toolbar:SetPoint("RIGHT", window.CloseButton, "LEFT", -4, 0)
+    else
+        toolbar:SetPoint("TOPRIGHT", -8, -top)
+    end
+    toolbar:SetSize(step * 5, 22)
     local x = 0
     local function tool(texture, tooltip, onClick)
-        local b = W.CreateIconButton(toolbar, texture, tooltip, onClick, 20)
+        local b = W.CreateIconButton(toolbar, texture, tooltip, onClick, iconSize)
         b:SetPoint("RIGHT", -x, 0)
-        x = x + 24
+        x = x + step
         return b
     end
     window.collapseButton = tool("Interface\\Buttons\\UI-Panel-CollapseButton-Up", "Collapse to a compact strip", function() UI.SetCompact(true) end)
@@ -496,13 +504,20 @@ local function createWindow()
     window.restartButton = W.CreateButton(window, "Restart Session", 110, 20, function()
         W.Confirm("RESTART", "Archive this session to the history and start a new one?", function() LL.Session.Restart() end)
     end)
-    window.restartButton:SetPoint("RIGHT", toolbar, "LEFT", -8, 0)
+    if modern then
+        window.restartButton:SetPoint("TOPRIGHT", -10, -(top + 1))
+    else
+        window.restartButton:SetPoint("RIGHT", toolbar, "LEFT", -8, 0)
+    end
+    -- The summary may wrap onto a second line when the window is narrow;
+    -- the "unpriced" hint rides along as a suffix instead of its own row.
     window.summary = W.CreateLabel(window, "GameFontHighlight", "", "LEFT")
     window.summary:SetPoint("TOPLEFT", 14, -(top + 30))
     window.summary:SetPoint("RIGHT", window, "RIGHT", -14, 0)
-    window.summary:SetWordWrap(false)
-    window.note = W.CreateLabel(window, "GameFontHighlightSmall", "", "LEFT")
-    window.note:SetPoint("TOPLEFT", 14, -(top + 50))
+    window.summary:SetHeight(34)
+    window.summary:SetJustifyV("TOP")
+    window.summary:SetWordWrap(true)
+    if window.summary.SetMaxLines then window.summary:SetMaxLines(2) end
 
     -- List inset.
     local inset = W.CreateInset(window)

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.1] - 2026-09-19
+
+- Quality borders in the flat style are now a proper full-size frame around the icon (the template's overlay was collapsing into a tiny stamp)
+- Narrow windows no longer overlap: tool icons live in the title bar, tabs and Restart Session share row two, and the summary wraps instead of clipping
+
 ## [1.1.0] - 2026-09-18
 
 - New default look: flat dark panels with a purple accent, logo in the title bar; the classic Blizzard window style stays available in Settings
