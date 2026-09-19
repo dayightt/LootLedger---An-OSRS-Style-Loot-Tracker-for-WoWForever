@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.1.0] - unreleased
+## [1.1.0] - 2026-09-18
 
 - New default look: flat dark panels with a purple accent, logo in the title bar; the classic Blizzard window style stays available in Settings
 - Party members' pickups are attributed to the corpse they are looting and shown dimmed; coin splits are credited to that mob too
