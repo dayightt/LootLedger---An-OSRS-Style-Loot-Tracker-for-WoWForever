@@ -121,6 +121,7 @@ LL.DEFAULTS = {
         compact = false,
         showUnclaimed = true,
         showPortraits = true,
+        skin = "modern",
         minimapButton = false,
         minimapAngle = 220,
         window = {},

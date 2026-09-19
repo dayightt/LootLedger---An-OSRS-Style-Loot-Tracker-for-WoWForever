@@ -90,17 +90,18 @@ local function createWindow()
     window = W.CreateWindow("LootLedgerHistoryFrame", "Session History", 400, 380)
     W.SetPortrait(window, "Interface\\Icons\\INV_Misc_Note_01")
     tinsert(UISpecialFrames, "LootLedgerHistoryFrame")
+    local top = W.ContentTop()
 
     local hint = W.CreateLabel(window, "GameFontHighlightSmall", GREY .. "Click a session for its full breakdown in chat.|r", "LEFT")
-    hint:SetPoint("TOPLEFT", 14, -34)
+    hint:SetPoint("TOPLEFT", 14, -(top + 4))
 
     window.clearButton = W.CreateButton(window, "Clear All", 90, 22, function()
         W.Confirm("CLEAR_HISTORY", "Delete every archived session for this character?", function() LL.Session.ClearHistory() end)
     end)
     window.clearButton:SetPoint("BOTTOMRIGHT", -10, 10)
 
-    local inset = CreateFrame("Frame", nil, window, "InsetFrameTemplate")
-    inset:SetPoint("TOPLEFT", 8, -54)
+    local inset = W.CreateInset(window)
+    inset:SetPoint("TOPLEFT", 8, -(top + 24))
     inset:SetPoint("BOTTOMRIGHT", -8, 38)
 
     local scroll = CreateFrame("ScrollFrame", nil, inset, "UIPanelScrollFrameTemplate")
@@ -121,6 +122,12 @@ end
 function UI.OpenHistory()
     if not window then createWindow() end
     if window:IsShown() then window:Hide() else window:Show() end
+end
+
+function UI.RebuildHistory()
+    if window then window:Hide() end
+    window = nil
+    rows = {}
 end
 
 LL.On("HISTORY_CHANGED", refresh)

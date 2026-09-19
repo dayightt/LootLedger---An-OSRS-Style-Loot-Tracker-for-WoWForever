@@ -1,6 +1,16 @@
 # Changelog
 
-## [1.0.0] - unreleased
+## [1.1.0] - unreleased
+
+- New default look: flat dark panels with a purple accent, logo in the title bar; the classic Blizzard window style stays available in Settings
+- Party members' pickups are attributed to the corpse they are looting and shown dimmed; coin splits are credited to that mob too
+- Loot with no mob behind it is listed under "Other loot" instead of being dropped
+- Rates show real coin icons; the summary line no longer wraps
+- Escape closes the full window (not the compact strip); the close button works in combat
+- Zero vendor prices count as known prices
+- Login line reports what was loaded from disk
+
+## [1.0.0] - 2026-09-18
 
 Initial release for World of Warcraft: Forever.
 

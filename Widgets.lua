@@ -1,6 +1,10 @@
--- Widgets: small helpers around the client's own frame templates so every
--- window looks like part of the default UI. Nothing here draws custom
--- textures; it only arranges what Blizzard ships.
+-- Widgets: every piece of chrome the windows are built from, in two skins.
+--
+-- "modern" (default): flat near-black panels, 1px borders, a narrow sans
+-- face and a single purple accent - no gold, no parchment.
+-- "blizzard": the client's own PortraitFrame / inset / tab templates.
+-- Nothing here ships textures or fonts; both skins use what the client
+-- already has.
 
 local _, LL = ...
 
@@ -13,20 +17,95 @@ Widgets.HEADER_HEIGHT = 44
 Widgets.ROW_HEIGHT = Widgets.ICON_SIZE + Widgets.ICON_GAP
 Widgets.SKULL_ICON = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01"
 Widgets.COIN_ICON = "Interface\\Icons\\INV_Misc_Coin_02"
+Widgets.LOGO = "Interface\\AddOns\\LootLedger\\textures\\logo.png"
 
--- Some templates expose SetTitle, older ones only the font string.
+local WHITE8 = "Interface\\Buttons\\WHITE8X8"
+
+Widgets.THEME = {
+    font = "Fonts\\ARIALN.TTF",
+    bg = { 0.055, 0.06, 0.07, 0.94 },
+    titleBar = { 0, 0, 0, 0.35 },
+    well = { 0.03, 0.033, 0.04, 0.9 },
+    border = { 0.19, 0.20, 0.23, 1 },
+    borderSoft = { 0.14, 0.15, 0.17, 1 },
+    button = { 0.11, 0.12, 0.14, 1 },
+    buttonHover = { 0.15, 0.17, 0.19, 1 },
+    accent = { 0.64, 0.21, 0.93 },
+    accentHex = "|cffa335ee",
+    text = { 0.92, 0.93, 0.95 },
+    muted = { 0.56, 0.58, 0.62 },
+    dim = { 0.40, 0.42, 0.46 },
+}
+local T = Widgets.THEME
+
+function Widgets.IsModern()
+    local s = LL.DB and LL.DB.settings
+    return not (s and s.skin == "blizzard")
+end
+
+local function backdrop(frame, bgColor, borderColor, edge)
+    frame:SetBackdrop({ bgFile = WHITE8, edgeFile = WHITE8, edgeSize = edge or 1 })
+    frame:SetBackdropColor(unpack(bgColor))
+    frame:SetBackdropBorderColor(unpack(borderColor))
+end
+Widgets.Backdrop = backdrop
+
+-- ---------------------------------------------------------------------
+-- Text
+-- ---------------------------------------------------------------------
+
+-- Roles map onto Blizzard font templates in the classic skin and onto
+-- ARIALN sizes/colours in the modern one. Callers pass either.
+local ROLES = {
+    GameFontNormal = { size = 13, color = "text" },
+    GameFontHighlight = { size = 13, color = "text" },
+    GameFontHighlightSmall = { size = 11, color = "muted" },
+    GameFontNormalSmall = { size = 11, color = "muted" },
+    GameFontNormalLarge = { size = 16, color = "accent" },
+    GameFontDisable = { size = 12, color = "dim" },
+    NumberFontNormal = { size = 12, color = "text", flags = "OUTLINE" },
+}
+
+function Widgets.CreateLabel(parent, template, text, justify)
+    template = template or "GameFontHighlight"
+    local fs
+    if Widgets.IsModern() then
+        local role = ROLES[template] or ROLES.GameFontHighlight
+        fs = parent:CreateFontString(nil, "OVERLAY")
+        fs:SetFont(T.font, role.size, role.flags or "")
+        fs:SetTextColor(unpack(T[role.color]))
+        fs:SetShadowColor(0, 0, 0, 0.8)
+        fs:SetShadowOffset(1, -1)
+    else
+        fs = parent:CreateFontString(nil, "OVERLAY", template)
+    end
+    if text then fs:SetText(text) end
+    if justify then fs:SetJustifyH(justify) end
+    return fs
+end
+
 function Widgets.SetTitle(frame, text)
-    if frame.SetTitle then
+    if frame.TitleText then
+        frame.TitleText:SetText(text)
+    elseif frame.SetTitle then
         frame:SetTitle(text)
     elseif frame.TitleContainer and frame.TitleContainer.TitleText then
         frame.TitleContainer.TitleText:SetText(text)
-    elseif frame.TitleText then
-        frame.TitleText:SetText(text)
     end
 end
 
 function Widgets.SetPortrait(frame, texture)
-    if frame.SetPortraitToAsset then
+    if frame.TitleIcon then
+        frame.TitleIcon:SetTexture(texture)
+        -- Blizzard icons carry a baked-in border worth cropping; our own
+        -- logo does not.
+        if texture == Widgets.LOGO then
+            frame.TitleIcon:SetTexCoord(0, 1, 0, 1)
+        else
+            frame.TitleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        end
+        frame.TitleIcon:Show()
+    elseif frame.SetPortraitToAsset then
         frame:SetPortraitToAsset(texture)
     elseif frame.PortraitContainer and frame.PortraitContainer.portrait then
         frame.PortraitContainer.portrait:SetTexture(texture)
@@ -35,11 +114,13 @@ function Widgets.SetPortrait(frame, texture)
     end
 end
 
--- A standard windowed frame: title bar, close button, movable, clamped.
-function Widgets.CreateWindow(name, title, width, height, template)
-    local frame = CreateFrame("Frame", name, UIParent, template or "PortraitFrameTemplate")
-    frame:SetSize(width, height)
-    frame:SetPoint("CENTER")
+-- ---------------------------------------------------------------------
+-- Windows
+-- ---------------------------------------------------------------------
+
+Widgets.TITLE_HEIGHT = 30
+
+local function makeMovable(frame)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -51,6 +132,69 @@ function Widgets.CreateWindow(name, title, width, height, template)
     end)
     frame:SetFrameStrata("MEDIUM")
     frame:SetToplevel(true)
+end
+
+local function createModernWindow(name, title, width, height)
+    local frame = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+    frame:SetSize(width, height)
+    frame:SetPoint("CENTER")
+    backdrop(frame, T.bg, T.border)
+
+    local bar = frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+    bar:SetPoint("TOPLEFT", 1, -1)
+    bar:SetPoint("TOPRIGHT", -1, -1)
+    bar:SetHeight(Widgets.TITLE_HEIGHT - 1)
+    bar:SetColorTexture(unpack(T.titleBar))
+
+    -- The accent rule under the title bar, fading out to the right.
+    local rule = frame:CreateTexture(nil, "ARTWORK")
+    rule:SetPoint("TOPLEFT", 1, -Widgets.TITLE_HEIGHT)
+    rule:SetPoint("TOPRIGHT", -1, -Widgets.TITLE_HEIGHT)
+    rule:SetHeight(1)
+    rule:SetColorTexture(1, 1, 1, 1)
+    rule:SetGradient("HORIZONTAL", CreateColor(T.accent[1], T.accent[2], T.accent[3], 0.9), CreateColor(T.accent[1], T.accent[2], T.accent[3], 0.08))
+    frame.AccentRule = rule
+
+    local icon = frame:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(20, 20)
+    icon:SetPoint("TOPLEFT", 8, -5)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:Hide()
+    frame.TitleIcon = icon
+
+    local titleText = frame:CreateFontString(nil, "OVERLAY")
+    titleText:SetFont(T.font, 15, "")
+    titleText:SetTextColor(unpack(T.accent))
+    titleText:SetShadowColor(0, 0, 0, 0.8)
+    titleText:SetShadowOffset(1, -1)
+    titleText:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+    titleText:SetText(title)
+    frame.TitleText = titleText
+
+    local close = CreateFrame("Button", nil, frame)
+    close:SetSize(22, 22)
+    close:SetPoint("TOPRIGHT", -5, -4)
+    local x = close:CreateFontString(nil, "OVERLAY")
+    x:SetFont(T.font, 18, "")
+    x:SetPoint("CENTER", 0, 1)
+    x:SetText("×")
+    x:SetTextColor(unpack(T.muted))
+    close.text = x
+    close:SetScript("OnEnter", function() x:SetTextColor(unpack(T.accent)) end)
+    close:SetScript("OnLeave", function() x:SetTextColor(unpack(T.muted)) end)
+    close:SetScript("OnClick", function() frame:Hide() end)
+    frame.CloseButton = close
+
+    makeMovable(frame)
+    frame:Hide()
+    return frame
+end
+
+local function createBlizzardWindow(name, title, width, height, template)
+    local frame = CreateFrame("Frame", name, UIParent, template or "PortraitFrameTemplate")
+    frame:SetSize(width, height)
+    frame:SetPoint("CENTER")
+    makeMovable(frame)
     Widgets.SetTitle(frame, title)
     -- The template's close button routes through HideUIPanel, which the
     -- client blocks for addon frames during combat. Hide directly instead.
@@ -59,6 +203,29 @@ function Widgets.CreateWindow(name, title, width, height, template)
     end
     frame:Hide()
     return frame
+end
+
+-- A standard window: title bar, close button, movable, clamped.
+function Widgets.CreateWindow(name, title, width, height, template)
+    if Widgets.IsModern() then
+        return createModernWindow(name, title, width, height)
+    end
+    return createBlizzardWindow(name, title, width, height, template)
+end
+
+-- Where content may start below the title area.
+function Widgets.ContentTop()
+    return Widgets.IsModern() and (Widgets.TITLE_HEIGHT + 6) or 30
+end
+
+-- The recessed panel that holds a list.
+function Widgets.CreateInset(parent)
+    if Widgets.IsModern() then
+        local inset = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+        backdrop(inset, T.well, T.borderSoft)
+        return inset
+    end
+    return CreateFrame("Frame", nil, parent, "InsetFrameTemplate")
 end
 
 -- Bottom-right grip that resizes the frame.
@@ -71,10 +238,14 @@ function Widgets.AddResizeGrip(frame, minWidth, minHeight, onResized)
     end
     local grip = CreateFrame("Button", nil, frame)
     grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", -4, 4)
+    grip:SetPoint("BOTTOMRIGHT", -3, 3)
     grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    if Widgets.IsModern() then
+        grip:GetNormalTexture():SetVertexColor(0.5, 0.5, 0.55)
+        grip:GetNormalTexture():SetAlpha(0.6)
+    end
     grip:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
     grip:SetScript("OnMouseUp", function()
         frame:StopMovingOrSizing()
@@ -86,8 +257,44 @@ function Widgets.AddResizeGrip(frame, minWidth, minHeight, onResized)
     return grip
 end
 
--- Standard gold button.
+-- ---------------------------------------------------------------------
+-- Buttons
+-- ---------------------------------------------------------------------
+
+local function createModernButton(parent, text, width, height, onClick)
+    local button = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    button:SetSize(width or 80, height or 22)
+    backdrop(button, T.button, T.border)
+    local label = button:CreateFontString(nil, "OVERLAY")
+    label:SetFont(T.font, 12, "")
+    label:SetTextColor(unpack(T.text))
+    label:SetPoint("CENTER", 0, 0)
+    label:SetText(text)
+    button.Label = label
+    button:SetScript("OnEnter", function(self)
+        if self:IsEnabled() then
+            self:SetBackdropColor(unpack(T.buttonHover))
+            self:SetBackdropBorderColor(T.accent[1], T.accent[2], T.accent[3], 0.9)
+        end
+    end)
+    button:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(unpack(T.button))
+        self:SetBackdropBorderColor(unpack(T.border))
+    end)
+    button:SetScript("OnMouseDown", function(self) if self:IsEnabled() then label:SetPoint("CENTER", 1, -1) end end)
+    button:SetScript("OnMouseUp", function() label:SetPoint("CENTER", 0, 0) end)
+    button:SetScript("OnEnable", function() label:SetTextColor(unpack(T.text)) end)
+    button:SetScript("OnDisable", function() label:SetTextColor(unpack(T.dim)) end)
+    button.SetText = function(self, t) label:SetText(t) end
+    if onClick then button:SetScript("OnClick", onClick) end
+    return button
+end
+
+-- Standard push button.
 function Widgets.CreateButton(parent, text, width, height, onClick)
+    if Widgets.IsModern() then
+        return createModernButton(parent, text, width, height, onClick)
+    end
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     button:SetSize(width or 80, height or 22)
     button:SetText(text)
@@ -104,9 +311,15 @@ function Widgets.CreateIconButton(parent, texture, tooltip, onClick, size)
     icon:SetAllPoints()
     button.icon = icon
     Widgets.SetIcon(button, texture)
-    local highlight = button:CreateTexture(nil, "HIGHLIGHT")
-    highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.2)
+    if Widgets.IsModern() then
+        icon:SetAlpha(0.75)
+        button:HookScript("OnEnter", function() icon:SetAlpha(1) end)
+        button:HookScript("OnLeave", function() icon:SetAlpha(0.75) end)
+    else
+        local highlight = button:CreateTexture(nil, "HIGHLIGHT")
+        highlight:SetAllPoints()
+        highlight:SetColorTexture(1, 1, 1, 0.2)
+    end
     button.tooltipText = tooltip
     button:SetScript("OnEnter", function(self)
         if not self.tooltipText then return end
@@ -130,12 +343,88 @@ function Widgets.SetIcon(button, texture)
     end
 end
 
-function Widgets.CreateLabel(parent, template, text, justify)
-    local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
-    if text then fs:SetText(text) end
-    if justify then fs:SetJustifyH(justify) end
-    return fs
+-- ---------------------------------------------------------------------
+-- Tabs
+-- ---------------------------------------------------------------------
+
+-- Returns { tabs = {...}, Select = function(self, index) }. Modern tabs sit
+-- inside the frame at `anchor`; classic tabs hang off the bottom edge.
+function Widgets.CreateTabs(frame, labels, onSelect, anchorX, anchorY)
+    local tabs = {}
+    local obj = { tabs = tabs }
+
+    if Widgets.IsModern() then
+        for i, label in ipairs(labels) do
+            local tab = CreateFrame("Button", nil, frame)
+            local text = tab:CreateFontString(nil, "OVERLAY")
+            text:SetFont(T.font, 13, "")
+            text:SetPoint("CENTER", 0, 1)
+            text:SetText(label)
+            tab.text = text
+            tab:SetSize(text:GetStringWidth() + 18, 24)
+            local underline = tab:CreateTexture(nil, "ARTWORK")
+            underline:SetPoint("BOTTOMLEFT", 4, 0)
+            underline:SetPoint("BOTTOMRIGHT", -4, 0)
+            underline:SetHeight(2)
+            underline:SetColorTexture(unpack(T.accent))
+            tab.underline = underline
+            tab:SetScript("OnClick", function() onSelect(i) end)
+            tab:SetScript("OnEnter", function() if not tab.active then text:SetTextColor(unpack(T.text)) end end)
+            tab:SetScript("OnLeave", function() if not tab.active then text:SetTextColor(unpack(T.muted)) end end)
+            if i == 1 then
+                tab:SetPoint("TOPLEFT", frame, "TOPLEFT", anchorX or 8, anchorY or -(Widgets.TITLE_HEIGHT + 4))
+            else
+                tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", 2, 0)
+            end
+            tabs[i] = tab
+        end
+        function obj:Select(index)
+            for i, tab in ipairs(tabs) do
+                tab.active = (i == index)
+                tab.underline:SetShown(tab.active)
+                tab.text:SetTextColor(unpack(tab.active and T.text or T.muted))
+            end
+        end
+        return obj
+    end
+
+    local usingTemplate = true
+    for i, label in ipairs(labels) do
+        local ok, tab = pcall(CreateFrame, "Button", frame:GetName() .. "Tab" .. i, frame, "PanelTabButtonTemplate")
+        if not ok or not tab then
+            usingTemplate = false
+            tab = Widgets.CreateButton(frame, label, 100, 22)
+        end
+        tab:SetID(i)
+        tab:SetText(label)
+        tab:SetScript("OnClick", function() onSelect(i) end)
+        if i == 1 then
+            tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 8, usingTemplate and 2 or -2)
+        else
+            tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", usingTemplate and -12 or 4, 0)
+        end
+        tabs[i] = tab
+    end
+    frame.Tabs = tabs
+    if usingTemplate and PanelTemplates_SetNumTabs then
+        pcall(PanelTemplates_SetNumTabs, frame, #labels)
+        for _, tab in ipairs(tabs) do
+            if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
+        end
+    end
+    function obj:Select(index)
+        if usingTemplate and PanelTemplates_SetTab then
+            pcall(PanelTemplates_SetTab, frame, index)
+        else
+            for i, tab in ipairs(tabs) do tab:SetEnabled(i ~= index) end
+        end
+    end
+    return obj
 end
+
+-- ---------------------------------------------------------------------
+-- Checkboxes
+-- ---------------------------------------------------------------------
 
 function Widgets.CreateCheckbox(parent, label, tooltip, onChanged)
     local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
@@ -162,6 +451,10 @@ function Widgets.CreateCheckbox(parent, label, tooltip, onChanged)
     return check
 end
 
+-- ---------------------------------------------------------------------
+-- Item icons
+-- ---------------------------------------------------------------------
+
 -- Item icon slot from the client's ItemButton template, falling back to a
 -- plain button with the same pieces if the template is unavailable.
 function Widgets.CreateItemButton(parent)
@@ -184,6 +477,23 @@ function Widgets.CreateItemButton(parent)
     end
     button:SetSize(Widgets.ICON_SIZE, Widgets.ICON_SIZE)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    if Widgets.IsModern() then
+        -- Drop the template's slot art; a 1px frame around the icon instead.
+        local normal = button.GetNormalTexture and button:GetNormalTexture()
+        if normal then normal:SetAlpha(0) end
+        local frame = CreateFrame("Frame", nil, button, "BackdropTemplate")
+        frame:SetPoint("TOPLEFT", -1, 1)
+        frame:SetPoint("BOTTOMRIGHT", 1, -1)
+        frame:SetFrameLevel(button:GetFrameLevel())
+        backdrop(frame, { 0, 0, 0, 0 }, T.border)
+        button.Frame = frame
+        if button.icon then button.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93) end
+        if button.Count then
+            button.Count:SetFont(T.font, 12, "OUTLINE")
+            button.Count:ClearAllPoints()
+            button.Count:SetPoint("BOTTOMRIGHT", -2, 2)
+        end
+    end
     return button
 end
 
@@ -229,6 +539,17 @@ function Widgets.FillItemButton(button, icon, count, quality, link, dimmed)
             button.IconBorder:Hide()
         end
     end
+    if button.Frame and Widgets.IsModern() then
+        -- Modern skin: the 1px frame takes the quality colour, so the
+        -- template's overlay is not needed on top.
+        if quality and quality > 1 then
+            local r, g, b = Widgets.QualityColor(quality)
+            button.Frame:SetBackdropBorderColor(r, g, b, 0.9)
+        else
+            button.Frame:SetBackdropBorderColor(unpack(T.border))
+        end
+        if button.IconBorder then button.IconBorder:Hide() end
+    end
     if SetItemButtonDesaturated then
         SetItemButtonDesaturated(button, dimmed and true or false)
     elseif button.icon then
@@ -245,17 +566,15 @@ function Widgets.SetItemButtonCountText(button, text)
     end
 end
 
+-- ---------------------------------------------------------------------
+-- Mob portrait
+-- ---------------------------------------------------------------------
+
 -- 3D headshot of a creature by npcID, with an icon fallback.
 function Widgets.CreatePortrait(parent, size)
     local holder = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     holder:SetSize(size, size)
-    holder:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-    })
-    holder:SetBackdropColor(0, 0, 0, 0.6)
-    holder:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    backdrop(holder, { 0, 0, 0, 0.6 }, Widgets.IsModern() and T.border or { 0.3, 0.3, 0.3, 1 })
 
     local fallback = holder:CreateTexture(nil, "ARTWORK")
     fallback:SetPoint("TOPLEFT", 1, -1)
@@ -300,6 +619,10 @@ function Widgets.CreatePortrait(parent, size)
 
     return holder
 end
+
+-- ---------------------------------------------------------------------
+-- Dialogs and menus
+-- ---------------------------------------------------------------------
 
 -- Confirmation popup with a stable id.
 function Widgets.Confirm(id, text, onAccept)

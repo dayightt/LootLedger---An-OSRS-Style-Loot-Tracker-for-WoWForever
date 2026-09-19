@@ -52,6 +52,7 @@ local function refreshToggles()
     canvas.minimapCheck:SetChecked(settings().minimapButton == true)
     canvas.unclaimedCheck:SetChecked(settings().showUnclaimed ~= false)
     canvas.portraitCheck:SetChecked(settings().showPortraits ~= false)
+    canvas.skinCheck:SetChecked(settings().skin == "blizzard")
 end
 
 local function buildCanvas()
@@ -94,8 +95,17 @@ local function buildCanvas()
         end)
     canvas.portraitCheck:SetPoint("TOPLEFT", canvas.unclaimedCheck, "BOTTOMLEFT", 0, -4)
 
+    canvas.skinCheck = W.CreateCheckbox(canvas, "Use the classic Blizzard window style",
+        "Off: flat dark panels with a purple accent. On: the game's own portrait-frame look.",
+        function(checked)
+            settings().skin = checked and "blizzard" or "modern"
+            LL.Fire("SETTINGS_CHANGED")
+            if UI.Rebuild then UI.Rebuild() end
+        end)
+    canvas.skinCheck:SetPoint("TOPLEFT", canvas.portraitCheck, "BOTTOMLEFT", 0, -4)
+
     local filterTitle = W.CreateLabel(canvas, "GameFontNormal", "Filtered items", "LEFT")
-    filterTitle:SetPoint("TOPLEFT", canvas.portraitCheck, "BOTTOMLEFT", 4, -16)
+    filterTitle:SetPoint("TOPLEFT", canvas.skinCheck, "BOTTOMLEFT", 4, -16)
     local filterDesc = W.CreateLabel(canvas, "GameFontHighlightSmall",
         "Right-click an item in the ledger to filter it. Filtered items are never tracked and are hidden from history.", "LEFT")
     filterDesc:SetPoint("TOPLEFT", filterTitle, "BOTTOMLEFT", 0, -4)

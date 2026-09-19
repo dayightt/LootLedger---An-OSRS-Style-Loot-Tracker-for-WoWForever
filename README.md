@@ -19,9 +19,10 @@ That's it. Nothing to configure. If **Auctionator** is installed, auction prices
 - The clock/coin button switches between **most recently active** and **highest value** ordering.
 - **Restart Session** archives the current stretch into **History** (auto-labelled with the instance you were in or your most-killed mob) and starts a new clock.
 - The collapse button shrinks the window to a one-line strip: `time · gold/hr · kills/hr · total`.
+- Two looks: a flat dark style with a purple accent (default), or the game's own portrait-frame style - switch in Settings.
 - **Reset All** wipes everything, after asking.
 
-Settings (Esc → Options → AddOns → LootLedger, or the gear button): minimap button, whether to show items other players picked up, mob portraits, and the list of filtered items.
+Settings (Esc → Options → AddOns → LootLedger, or the gear button): window style, minimap button, whether to show items other players picked up, mob portraits, and the list of filtered items.
 
 ## How it works
 

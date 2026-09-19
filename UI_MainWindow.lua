@@ -10,7 +10,6 @@ LL.UI = UI
 
 local DEFAULT_WIDTH, DEFAULT_HEIGHT = 440, 520
 local MIN_WIDTH, MIN_HEIGHT = 340, 260
-local LIST_TOP = 100
 local GREY = "|cffaaaaaa"
 local SEP = "  |cff777777·|r  "
 
@@ -81,13 +80,13 @@ local function buildHeader(frame)
 
     local highlight = frame:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetAllPoints()
-    highlight:SetColorTexture(1, 1, 1, 0.06)
+    highlight:SetColorTexture(1, 1, 1, W.IsModern() and 0.035 or 0.06)
 
     local line = frame:CreateTexture(nil, "BACKGROUND")
     line:SetPoint("BOTTOMLEFT", 2, 0)
     line:SetPoint("BOTTOMRIGHT", -2, 0)
     line:SetHeight(1)
-    line:SetColorTexture(1, 1, 1, 0.08)
+    line:SetColorTexture(1, 1, 1, W.IsModern() and 0.05 or 0.08)
 
     frame.portrait = W.CreatePortrait(frame, W.ICON_SIZE)
     frame.portrait:SetPoint("LEFT", 4, 0)
@@ -99,6 +98,17 @@ local function buildHeader(frame)
     frame.kills = W.CreateLabel(frame, "GameFontHighlightSmall", nil, "LEFT")
     frame.value = W.CreateLabel(frame, "GameFontHighlight", nil, "RIGHT")
     frame.value:SetPoint("RIGHT", -8, 0)
+    if W.IsModern() then
+        local T = W.THEME
+        frame.arrow:SetDesaturated(true)
+        frame.arrow:SetVertexColor(0.65, 0.67, 0.72)
+        frame:HookScript("OnEnter", function(self)
+            if self.section and not self.section.unnamed then self.name:SetTextColor(unpack(T.accent)) end
+        end)
+        frame:HookScript("OnLeave", function(self)
+            self.name:SetTextColor(unpack(T.text))
+        end)
+    end
 end
 
 local function initHeader(frame, data)
@@ -132,6 +142,7 @@ local function initHeader(frame, data)
     frame.name:SetPoint("TOPLEFT", left + 20, -7)
     frame.name:SetPoint("RIGHT", frame.value, "LEFT", -8, 0)
     frame.name:SetText((sec.unnamed and GREY or "") .. sec.name .. (sec.unnamed and "|r" or ""))
+    if W.IsModern() then frame.name:SetTextColor(unpack(W.THEME.text)) end
 
     frame.kills:ClearAllPoints()
     frame.kills:SetPoint("BOTTOMLEFT", left + 20, 7)
@@ -310,47 +321,6 @@ local function createList(parent)
 end
 
 -- ---------------------------------------------------------------------
--- Tabs
--- ---------------------------------------------------------------------
-
-local function createTabs(frame, labels, onSelect)
-    local tabs = {}
-    local usingTemplate = true
-    for i, label in ipairs(labels) do
-        local ok, tab = pcall(CreateFrame, "Button", frame:GetName() .. "Tab" .. i, frame, "PanelTabButtonTemplate")
-        if not ok or not tab then
-            usingTemplate = false
-            tab = W.CreateButton(frame, label, 100, 22)
-        end
-        tab:SetID(i)
-        tab:SetText(label)
-        tab:SetScript("OnClick", function() onSelect(i) end)
-        if i == 1 then
-            tab:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 8, usingTemplate and 2 or -2)
-        else
-            tab:SetPoint("LEFT", tabs[i - 1], "RIGHT", usingTemplate and -12 or 4, 0)
-        end
-        tabs[i] = tab
-    end
-    frame.Tabs = tabs
-    if usingTemplate and PanelTemplates_SetNumTabs then
-        pcall(PanelTemplates_SetNumTabs, frame, #labels)
-        for _, tab in ipairs(tabs) do
-            if PanelTemplates_TabResize then pcall(PanelTemplates_TabResize, tab, 0) end
-        end
-    end
-    local obj = { tabs = tabs }
-    function obj:Select(index)
-        if usingTemplate and PanelTemplates_SetTab then
-            pcall(PanelTemplates_SetTab, frame, index)
-        else
-            for i, tab in ipairs(tabs) do tab:SetEnabled(i ~= index) end
-        end
-    end
-    return obj
-end
-
--- ---------------------------------------------------------------------
 -- Summary and strip text
 -- ---------------------------------------------------------------------
 
@@ -478,7 +448,7 @@ end
 
 local function createWindow()
     window = W.CreateWindow("LootLedgerFrame", "Loot Ledger", DEFAULT_WIDTH, DEFAULT_HEIGHT)
-    W.SetPortrait(window, W.COIN_ICON)
+    W.SetPortrait(window, W.LOGO)
     -- Escape closes the full window; the compact strip is not registered
     -- and stays put.
     tinsert(UISpecialFrames, "LootLedgerFrame")
@@ -491,10 +461,12 @@ local function createWindow()
         if computeIconsPerRow() ~= iconsPerRow then UI.Refresh() end
     end
     restorePosition(window, "window", DEFAULT_WIDTH, DEFAULT_HEIGHT)
+    local top = W.ContentTop()
+    local listTop = top + 70
 
     -- Toolbar (right-aligned icon buttons).
     local toolbar = CreateFrame("Frame", nil, window)
-    toolbar:SetPoint("TOPRIGHT", -8, -30)
+    toolbar:SetPoint("TOPRIGHT", -8, -top)
     toolbar:SetSize(160, 22)
     local x = 0
     local function tool(texture, tooltip, onClick)
@@ -526,22 +498,22 @@ local function createWindow()
     end)
     window.restartButton:SetPoint("RIGHT", toolbar, "LEFT", -8, 0)
     window.summary = W.CreateLabel(window, "GameFontHighlight", "", "LEFT")
-    window.summary:SetPoint("TOPLEFT", 14, -60)
+    window.summary:SetPoint("TOPLEFT", 14, -(top + 30))
     window.summary:SetPoint("RIGHT", window, "RIGHT", -14, 0)
     window.summary:SetWordWrap(false)
     window.note = W.CreateLabel(window, "GameFontHighlightSmall", "", "LEFT")
-    window.note:SetPoint("TOPLEFT", 14, -80)
+    window.note:SetPoint("TOPLEFT", 14, -(top + 50))
 
     -- List inset.
-    local inset = CreateFrame("Frame", nil, window, "InsetFrameTemplate")
-    inset:SetPoint("TOPLEFT", 8, -LIST_TOP)
+    local inset = W.CreateInset(window)
+    inset:SetPoint("TOPLEFT", 8, -listTop)
     inset:SetPoint("BOTTOMRIGHT", -8, 8)
     window.inset = inset
     list = createList(inset)
 
-    window.tabs = createTabs(window, { "This Session", "All Time" }, function(index)
+    window.tabs = W.CreateTabs(window, { "This Session", "All Time" }, function(index)
         setViewMode(index == 1 and "session" or "alltime")
-    end)
+    end, 8, -(top - 2))
 
     window:SetScript("OnShow", function()
         UI.Refresh()
@@ -552,13 +524,17 @@ end
 local function createStrip()
     strip = CreateFrame("Frame", "LootLedgerStrip", UIParent, "BackdropTemplate")
     strip:SetSize(300, 24)
-    strip:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = 1,
-    })
-    strip:SetBackdropColor(0.05, 0.05, 0.05, 0.85)
-    strip:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+    if W.IsModern() then
+        W.Backdrop(strip, W.THEME.bg, W.THEME.border)
+        local rule = strip:CreateTexture(nil, "ARTWORK")
+        rule:SetPoint("BOTTOMLEFT", 1, 1)
+        rule:SetPoint("BOTTOMRIGHT", -1, 1)
+        rule:SetHeight(1)
+        rule:SetColorTexture(1, 1, 1, 1)
+        rule:SetGradient("HORIZONTAL", CreateColor(W.THEME.accent[1], W.THEME.accent[2], W.THEME.accent[3], 0.9), CreateColor(W.THEME.accent[1], W.THEME.accent[2], W.THEME.accent[3], 0.05))
+    else
+        W.Backdrop(strip, { 0.05, 0.05, 0.05, 0.85 }, { 0.35, 0.35, 0.35, 1 })
+    end
     strip:SetMovable(true)
     strip:SetClampedToScreen(true)
     strip:EnableMouse(true)
@@ -626,6 +602,18 @@ end
 
 function UI.Toggle()
     if UI.IsShown() then UI.Hide() else UI.Show() end
+end
+
+-- Throws the built frames away so the next Show constructs them in the
+-- current skin. Old frames stay hidden and unreferenced.
+function UI.Rebuild()
+    local wasShown = UI.IsShown()
+    if window then window:Hide(); window = nil end
+    if strip then strip:Hide(); strip = nil end
+    list = nil
+    lastReport = nil
+    if UI.RebuildHistory then UI.RebuildHistory() end
+    if wasShown then UI.Show() end
 end
 
 for _, event in ipairs({ "LEDGER_CHANGED", "SESSION_CHANGED", "PRICES_CHANGED", "FILTERS_CHANGED", "SETTINGS_CHANGED", "HISTORY_CHANGED" }) do
