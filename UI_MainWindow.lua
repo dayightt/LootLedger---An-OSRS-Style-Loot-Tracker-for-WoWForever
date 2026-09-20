@@ -61,7 +61,12 @@ local function onHeaderClick(frame, button)
                 W.Confirm("RESET_OTHER", "Clear all loot that had no mob behind it?", function() LL.Ledger.ResetOther() end)
             end }
         else
-            entries[1] = { text = "Reset this mob", func = function()
+            entries[1] = { text = "Rename...", func = function()
+                W.Prompt("RENAME", string.format("Name for %s:", sec.name), sec.unnamed and "" or sec.name, function(value)
+                    LL.Guid.SetName(sec.npcID, value)
+                end)
+            end }
+            entries[2] = { text = "Reset this mob", func = function()
                 W.Confirm("RESET_MOB", string.format("Reset everything recorded for %s?", sec.name), function() LL.Ledger.ResetMob(sec.npcID) end)
             end }
         end

@@ -16,6 +16,7 @@ LL.Tracker = Tracker
 local Items, Guid, Ledger = LL.Items, LL.Guid, LL.Ledger
 
 local CORPSE_TTL = 600      -- seconds a corpse GUID stays deduped
+local DEATH_TTL = 60        -- seconds an experience-message name waits for its corpse
 local PENDING_TTL = 15      -- seconds a cleared slot waits for its receipt
 local ROLL_FALLBACK = 300   -- seconds a roll win may trail the corpse it came from
 local MOUSEOVER_THROTTLE = 0.25
@@ -26,6 +27,7 @@ local state = {
     pendingCoin = {},
     recentCorpses = {},
     lastCorpse = nil,
+    recentDeaths = {},
 }
 Tracker._state = state
 
@@ -76,6 +78,7 @@ local AMOUNT_FORMATS = { GOLD_AMOUNT = 10000, SILVER_AMOUNT = 100, COPPER_AMOUNT
 local lootPatterns = {}
 local moneyPatterns = {}
 local amountPatterns = {}
+local deathPatterns = {}
 
 function Tracker.CompilePatterns()
     lootPatterns = {}
@@ -104,6 +107,27 @@ function Tracker.CompilePatterns()
             amountPatterns[#amountPatterns + 1] = { pattern = p, mult = mult }
         end
     end
+    -- "%s dies, you gain %d experience." and its group/rested variants.
+    -- The mob name leads every one of them.
+    deathPatterns = {}
+    for key, fmt in pairs(_G) do
+        if type(key) == "string" and type(fmt) == "string"
+            and string.find(key, "^COMBATLOG_XPGAIN_") and string.find(fmt, "^%%s") then
+            deathPatterns[#deathPatterns + 1] = patternFromFormat(fmt)
+        end
+    end
+    table.sort(deathPatterns, function(a, b) return #a > #b end)
+end
+
+-- The mob named in an experience-gain line, or nil.
+function Tracker.ParseDeathMessage(text)
+    text = LL.Plain(text)
+    if type(text) ~= "string" then return nil end
+    for _, pattern in ipairs(deathPatterns) do
+        local name = string.match(text, pattern)
+        if name and name ~= "" then return name end
+    end
+    return nil
 end
 
 -- Returns kind ("own"/"other"), link, quantity, playerName, isRoll - or nil
@@ -209,6 +233,26 @@ local function purgeCorpses(now)
     end
 end
 
+local function purgeDeaths(now)
+    local list = state.recentDeaths
+    while list[1] and now - list[1].t > DEATH_TTL do table.remove(list, 1) end
+end
+
+-- A name for a corpse the unit APIs would not name: the recent experience
+-- messages, but only when they agree (one death, or all the same mob).
+-- A mixed pull is ambiguous and must not poison the name cache.
+function Tracker.NameFromRecentDeaths(now)
+    purgeDeaths(now)
+    local list = state.recentDeaths
+    if #list == 0 then return nil end
+    local name = list[1].name
+    for i = 2, #list do
+        if list[i].name ~= name then return nil end
+    end
+    table.remove(list, 1)
+    return name
+end
+
 -- ---------------------------------------------------------------------
 -- Loot window
 -- ---------------------------------------------------------------------
@@ -281,8 +325,16 @@ function Tracker.OnLootReady()
 
     for _, corpse in ipairs(newCorpses) do
         local name = Guid.ResolveName(corpse.guid, corpse.npcID)
+        local how = "unit"
+        if not name then
+            name = Tracker.NameFromRecentDeaths(now)
+            if name then
+                Guid.Learn(corpse.npcID, name)
+                how = "experience message"
+            end
+        end
         Ledger.RecordKill(corpse.npcID, name)
-        trace("kill: %s (#%d) %s", tostring(name), corpse.npcID, corpse.guid)
+        trace("kill: %s (#%d) %s [%s]", tostring(name), corpse.npcID, corpse.guid, name and how or "unnamed")
     end
     trace("loot window: %d slot(s), %d new corpse(s)", num, #newCorpses)
     for _, s in ipairs(snap.slots) do
@@ -402,6 +454,12 @@ function Tracker.OnChatLoot(text, playerName)
         trace("ignored filtered item %s", name or itemKey)
         return
     end
+    if kind == "other" and LL.DB.settings.showUnclaimed ~= true then
+        -- Other players' pickups are only recorded when the user asked to
+        -- see them. Decided before touching the pending queue, so an
+        -- ignored message can never consume the slot your own receipt needs.
+        return
+    end
     local now = LL.Clock()
     local npcID, how = attribute(itemKey, isRoll, now, kind, player or playerName)
     if kind == "own" then
@@ -446,7 +504,20 @@ LL.RegisterEvent("LOOT_CLOSED", function() Tracker.OnLootClosed() end)
 LL.RegisterEvent("CHAT_MSG_LOOT", function(_, text, playerName) Tracker.OnChatLoot(text, playerName) end)
 LL.RegisterEvent("CHAT_MSG_MONEY", function(_, text) Tracker.OnChatMoney(text) end)
 
+LL.RegisterEvent("CHAT_MSG_COMBAT_XP_GAIN", function(_, text)
+    local name = Tracker.ParseDeathMessage(text)
+    if name then
+        table.insert(state.recentDeaths, { name = name, t = LL.Clock() })
+        trace("death: %s", name)
+    end
+end)
 LL.RegisterEvent("PLAYER_TARGET_CHANGED", function() Guid.LearnUnit("target") end)
+LL.RegisterEvent("NAME_PLATE_UNIT_ADDED", function(_, unit)
+    unit = LL.Plain(unit)
+    if type(unit) == "string" then Guid.LearnUnit(unit) end
+end)
+-- Leaving combat is the moment withheld names tend to become readable.
+LL.RegisterEvent("PLAYER_REGEN_ENABLED", function() Guid.RetryUnnamed() end)
 
 local lastMouseover = 0
 LL.RegisterEvent("UPDATE_MOUSEOVER_UNIT", function()

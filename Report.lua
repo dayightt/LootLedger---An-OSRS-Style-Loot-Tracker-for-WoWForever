@@ -81,7 +81,7 @@ end
 function Report.Build(scope)
     scope = scope or "session"
     local settings = LL.DB.settings
-    local showUnclaimed = settings.showUnclaimed ~= false
+    local showUnclaimed = settings.showUnclaimed == true
     local state = { anyUnpriced = false }
     local sections = {}
 

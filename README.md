@@ -22,12 +22,12 @@ That's it. Nothing to configure. If **Auctionator** is installed, auction prices
 - Two looks: a flat dark style with a purple accent (default), or the game's own portrait-frame style - switch in Settings.
 - **Reset All** wipes everything, after asking.
 
-Settings (Esc → Options → AddOns → LootLedger, or the gear button): window style, minimap button, whether to show items other players picked up, mob portraits, and the list of filtered items.
+Settings (Esc → Options → AddOns → LootLedger, or the gear button): window style, minimap button, whether to track items other players pick up, mob portraits, and the list of filtered items.
 
 ## How it works
 
 - **Kills and attribution** come from the loot window itself. When you open a corpse the client tells the addon exactly which creature each slot came from, so loot is never guessed from your target. A kill is a corpse you opened - one you never loot doesn't count, which is the right definition for gold per hour.
-- **Groups:** the coin you're credited is your share, not the corpse total; items you win on a roll count for you; items other players pick up are shown dimmed under the mob and never counted toward your total.
+- **Groups:** the coin you're credited is your share, not the corpse total; items you win on a roll count for you; items other players pick up are ignored unless you turn on **Track loot other players pick up** in Settings, in which case they're shown dimmed under the mob and never counted toward your total.
 - **Pricing:** the higher of vendor price and any available auction-house price. Grey items are always vendor price. Price providers are pluggable - `Pricing_Auctionator.lua` is one; add another file that calls `LL.Pricing.Register` and list it in the `.toc`.
 - **No combat-log dependence.** The addon never reads the combat log, so it works under the client's addon restrictions and keeps working inside instances.
 

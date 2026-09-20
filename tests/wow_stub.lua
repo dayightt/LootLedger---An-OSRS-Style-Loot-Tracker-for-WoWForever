@@ -462,6 +462,11 @@ function stub.ResetStrings()
     _G.SILVER_AMOUNT = "%d Silver"
     _G.COPPER_AMOUNT = "%d Copper"
     _G.CURRENCY_GAINED = "You receive currency: %s"
+    _G.COMBATLOG_XPGAIN_FIRSTPERSON = "%s dies, you gain %d experience."
+    _G.COMBATLOG_XPGAIN_FIRSTPERSON_UNNAMED = "You gain %d experience."
+    _G.COMBATLOG_XPGAIN_FIRSTPERSON_GROUP = "%s dies, you gain %d experience. (+%d group bonus)"
+    _G.COMBATLOG_XPGAIN_EXHAUSTION1 = "%s dies, you gain %d experience. (%s exp %s bonus)"
+    _G.COMBATLOG_XPGAIN_EXHAUSTION1_GROUP = "%s dies, you gain %d experience. (%s exp %s bonus, +%d group bonus)"
     _G.CURRENCY_GAINED_MULTIPLE = "You receive currency: %sx%d"
 end
 stub.ResetStrings()

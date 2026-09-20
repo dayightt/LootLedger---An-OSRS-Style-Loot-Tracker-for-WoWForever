@@ -12,6 +12,16 @@ LL.Guid = Guid
 
 local ID_KINDS = { Creature = true, Vehicle = true, GameObject = true, Pet = true }
 
+-- Last GUID seen per npcID this session, so an unnamed mob can be retried
+-- later (names can be withheld from addons while in combat or in some
+-- instanced content, then become readable again).
+local lastGuids = {}
+Guid._lastGuids = lastGuids
+
+function Guid.NoteGuid(npcID, guid)
+    if npcID and type(guid) == "string" then lastGuids[npcID] = guid end
+end
+
 -- Returns kind ("Creature", "Player", "GameObject", ...) and, for kinds
 -- that carry an entry id in field 6, that id as a number.
 function Guid.Parse(guid)
@@ -78,6 +88,7 @@ end
 function Guid.ResolveName(guid, npcID)
     guid = LL.Plain(guid)
     npcID = npcID or Guid.NpcID(guid)
+    Guid.NoteGuid(npcID, guid)
     local cached = Guid.CachedName(npcID)
     if cached then return cached end
     if type(guid) ~= "string" then return nil end
@@ -86,11 +97,50 @@ function Guid.ResolveName(guid, npcID)
     return name
 end
 
+-- Tries again for every mob record still without a name, using the last
+-- GUID seen for it. Returns how many were resolved.
+function Guid.RetryUnnamed()
+    if not LL.DB then return 0 end
+    local resolved = 0
+    for npcID, rec in pairs(LL.DB.mobs) do
+        if not rec.name then
+            local cached = Guid.CachedName(npcID)
+            if cached then
+                remember(npcID, cached)
+                resolved = resolved + 1
+            else
+                local guid = lastGuids[npcID]
+                if guid and Guid.ResolveName(guid, npcID) then
+                    resolved = resolved + 1
+                end
+            end
+        end
+    end
+    return resolved
+end
+
+-- A name learned from a source other than the unit itself (e.g. the
+-- experience message at the moment of death). Cached like any other.
+function Guid.Learn(npcID, name)
+    if not npcID or type(name) ~= "string" or name == "" then return end
+    remember(npcID, name)
+end
+
+-- A name the user typed in. Overrides whatever was learned.
+function Guid.SetName(npcID, name)
+    if not npcID or type(name) ~= "string" then return end
+    name = strtrim(name)
+    if name == "" then return end
+    LL.DB.npcNames[npcID] = name
+    LL.Ledger.Rename(npcID, name)
+end
+
 -- Opportunistic learning from a unit token (target, mouseover, ...).
 function Guid.LearnUnit(unit)
     local guid = LL.Plain(UnitGUID(unit))
     local npcID = Guid.NpcID(guid)
     if not npcID then return end
+    Guid.NoteGuid(npcID, guid)
     if LL.Plain(UnitIsPlayer(unit)) then return end
     local name = LL.Plain(UnitName(unit))
     if type(name) ~= "string" or name == "" then return end

@@ -647,6 +647,45 @@ function Widgets.Confirm(id, text, onAccept)
     StaticPopup_Show(which, text, nil, { onAccept = onAccept })
 end
 
+-- Text prompt with an edit box.
+function Widgets.Prompt(id, text, current, onAccept)
+    local which = "LOOTLEDGER_PROMPT_" .. id
+    if not StaticPopupDialogs[which] then
+        local function accept(self, data)
+            local box = self.editBox or self.EditBox
+            local value = box and box:GetText() or ""
+            if data and data.onAccept then data.onAccept(value) end
+        end
+        StaticPopupDialogs[which] = {
+            text = "%s",
+            button1 = ACCEPT or "Accept",
+            button2 = CANCEL or "Cancel",
+            hasEditBox = true,
+            editBoxWidth = 260,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+            OnAccept = accept,
+            EditBoxOnEnterPressed = function(self)
+                local parent = self:GetParent()
+                accept(parent, parent.data)
+                parent:Hide()
+            end,
+            EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+            OnShow = function(self, data)
+                local box = self.editBox or self.EditBox
+                if box then
+                    box:SetText(data and data.current or "")
+                    box:HighlightText()
+                    box:SetFocus()
+                end
+            end,
+        }
+    end
+    StaticPopup_Show(which, text, nil, { onAccept = onAccept, current = current })
+end
+
 -- Right-click menu; falls back to running the first action if the
 -- modern menu API is not present.
 function Widgets.ContextMenu(owner, title, entries)

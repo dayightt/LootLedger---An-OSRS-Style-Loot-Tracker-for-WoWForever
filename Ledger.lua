@@ -122,6 +122,15 @@ function Ledger.SetName(npcID, name)
     if changed then LL.Fire("LEDGER_CHANGED") end
 end
 
+-- Sets a mob's display name in both scopes, replacing any existing one.
+function Ledger.Rename(npcID, name)
+    for _, container in ipairs({ scopes() }) do
+        local rec = container.mobs[npcID]
+        if rec then rec.name = name end
+    end
+    LL.Fire("LEDGER_CHANGED")
+end
+
 function Ledger.ResetMob(npcID)
     for _, container in ipairs({ scopes() }) do
         container.mobs[npcID] = nil

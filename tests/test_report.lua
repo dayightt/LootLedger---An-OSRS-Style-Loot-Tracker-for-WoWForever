@@ -7,6 +7,7 @@ local EGG = "|cnIQ0:|Hitem:4757::::::::6:1485:::::::::|h[Cracked Egg Shells]|h|r
 local function load()
     local LL = stub.LoadAddon()
     stub.FireEvent("PLAYER_LOGIN")
+    LL.DB.settings.showUnclaimed = true
     stub.SetItems({
         [159] = { name = "Refreshing Spring Water", quality = 1, sellPrice = 13, icon = 132794 },
         [4540] = { name = "Tough Hunk of Bread", quality = 1, sellPrice = 25, icon = 133964 },

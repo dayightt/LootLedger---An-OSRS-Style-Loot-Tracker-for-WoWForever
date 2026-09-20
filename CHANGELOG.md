@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.2] - 2026-09-20
+
+- Mobs whose name could not be read when looted (common in dungeons) are named later from nameplates, from your target after combat, or from the "X dies, you gain N experience" line when it is unambiguous
+- Right-click a mob header to rename it yourself; the name sticks across sessions and history
+- Loot other players pick up is now ignored by default; turn on "Track loot other players pick up" in Settings to see it dimmed under the mob again
+
 ## [1.1.1] - 2026-09-19
 
 - Quality borders in the flat style are now a proper full-size frame around the icon (the template's overlay was collapsing into a tiny stamp)

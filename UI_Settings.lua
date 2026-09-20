@@ -50,7 +50,7 @@ end
 local function refreshToggles()
     if not canvas then return end
     canvas.minimapCheck:SetChecked(settings().minimapButton == true)
-    canvas.unclaimedCheck:SetChecked(settings().showUnclaimed ~= false)
+    canvas.unclaimedCheck:SetChecked(settings().showUnclaimed == true)
     canvas.portraitCheck:SetChecked(settings().showPortraits ~= false)
     canvas.skinCheck:SetChecked(settings().skin == "blizzard")
 end
@@ -79,8 +79,8 @@ local function buildCanvas()
         end)
     canvas.minimapCheck:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", -4, -14)
 
-    canvas.unclaimedCheck = W.CreateCheckbox(canvas, "Show loot other players picked up",
-        "Items that dropped from a mob but went to someone else are shown dimmed and never counted toward your totals.",
+    canvas.unclaimedCheck = W.CreateCheckbox(canvas, "Track loot other players pick up",
+        "Items that dropped from a mob but went to someone else are recorded and shown dimmed under the mob (never counted toward your totals). Off by default.",
         function(checked)
             settings().showUnclaimed = checked
             LL.Fire("SETTINGS_CHANGED")
